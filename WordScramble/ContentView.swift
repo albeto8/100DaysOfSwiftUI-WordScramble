@@ -19,35 +19,65 @@ struct ContentView: View {
     @State private var showingError = false
     
     @State private var score = 0
+        
+    func renderOffset(_ geoRect: CGRect, _ fullRect: CGRect) -> CGFloat {
+        let height = fullRect.maxY * 0.6
+        if geoRect.minY < height {
+            return 0
+        }
+        return geoRect.minY - height
+    }
+    
+    func renderColor(_ geoRect: CGRect, _ fullRect: CGRect) -> Color {
+        let startPosition = fullRect.minY
+        let endPosition = fullRect.maxY
+        let itemPosition = geoRect.minY
+        
+        let hue = (itemPosition - startPosition) / (endPosition - startPosition)
+        
+        let color = Color(hue: Double(hue), saturation: 0.7, brightness: 0.8)
+        return color
+    }
     
     var body: some View {
         NavigationView {
-            VStack {
-                TextField("Enter your word", text: $newWord, onCommit: addNewWord)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding()
-                    .autocapitalization(.none)
+            GeometryReader { geometry in
+                VStack {
+                    TextField("Enter your word", text: self.$newWord, onCommit: self.addNewWord)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding()
+                        .autocapitalization(.none)
 
-                List(usedWords, id: \.self) { word in
-                    HStack {
-                        Image(systemName: "\(word.count).circle")
-                        Text(word)
+                    List(self.usedWords, id: \.self) { word in
+                        GeometryReader { geo in
+                            HStack {
+                                Image(systemName: "\(word.count).circle")
+                                    .foregroundColor(self.renderColor(geo.frame(in: .global), geometry.frame(in: .global)))
+                                Text(word)
+                            }
+                            .accessibilityElement(children: .ignore)
+                            .accessibility(label: Text("\(word), \(word.count) letters"))
+                            .frame(width: geo.size.width, alignment: .leading)
+                            .offset(x: self.renderOffset(geo.frame(in: .global), geometry.frame(in: .global)), y: 0.0)
+                            .onTapGesture {
+                                print("Global geo center: maxY \(geo.frame(in: .global).maxY) minY \(geo.frame(in: .global).minY) midY: \(geo.frame(in: .global).midY)")
+                                print("Global geometry center: maxY \(geometry.frame(in: .global).maxY) minY \(geometry.frame(in: .global).minY) midY: \(geometry.frame(in: .global).midY)")
+                            }
+                        }
                     }
-                    .accessibilityElement(children: .ignore)
-                    .accessibility(label: Text("\(word), \(word.count) letters"))
+                    Text("Current score: \(self.score)")
                 }
-                Text("Current score: \(score)")
+                .navigationBarTitle(self.rootWord)
+                .onAppear(perform: self.startGame)
+                .alert(isPresented: self.$showingError) {
+                    Alert(title: Text(self.errorTitle), message: Text(self.errorMessage), dismissButton: .default(Text("OK")))
+                }
+                .navigationBarItems(leading: Button(action: {
+                    self.startGame()
+                }) {
+                    Text("start game")
+                })
             }
-            .navigationBarTitle(rootWord)
-            .onAppear(perform: startGame)
-            .alert(isPresented: $showingError) {
-                Alert(title: Text(errorTitle), message: Text(errorMessage), dismissButton: .default(Text("OK")))
-            }
-            .navigationBarItems(leading: Button(action: {
-                self.startGame()
-            }) {
-                Text("start game")
-            })
         }
     }
     
